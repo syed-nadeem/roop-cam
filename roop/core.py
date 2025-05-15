@@ -20,7 +20,6 @@ import tensorflow
 import roop.globals
 import roop.metadata
 import roop.ui as ui
-from roop.predicter import predict_image, predict_video
 from roop.processors.frame.core import get_frame_processors_modules
 from roop.utilities import has_image_extension, is_image, is_video, detect_fps, create_video, extract_frames, get_temp_frame_paths, restore_audio, create_temp, move_temp, clean_temp, normalize_output_path
 
@@ -66,6 +65,50 @@ def parse_args() -> None:
     roop.globals.execution_providers = decode_execution_providers(args.execution_provider)
     roop.globals.execution_threads = args.execution_threads
 
+    if 'DmlExecutionProvider' in roop.globals.execution_providers:
+        sess_options = onnxruntime.SessionOptions()
+        sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_PARALLEL
+        sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_options.intra_op_num_threads = 1
+
+    if 'CPUExecutionProvider' in roop.globals.execution_providers:
+        sess_options = onnxruntime.SessionOptions()
+        sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_PARALLEL
+        sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_options.intra_op_num_threads = roop.globals.execution_threads
+    
+    if 'CUDAExecutionProvider' in roop.globals.execution_providers:
+
+        sess_options = onnxruntime.SessionOptions()
+        sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_PARALLEL
+        sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_options.intra_op_num_threads = roop.globals.execution_threads
+        
+        roop.globals.execution_providers = [
+            ('CUDAExecutionProvider', {
+                'enable_cuda_graph': 0,
+                'tunable_op_enable': 1, 
+                'tunable_op_tuning_enable': 1,
+                'cudnn_conv_algo_search': 'EXHAUSTIVE',
+            })
+        ]
+
+    if 'TensorrtExecutionProvider' in roop.globals.execution_providers:
+
+        sess_options = onnxruntime.SessionOptions()
+        sess_options.execution_mode = onnxruntime.ExecutionMode.ORT_PARALLEL
+        sess_options.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_ENABLE_ALL
+        sess_options.intra_op_num_threads = roop.globals.execution_threads
+        
+        roop.globals.execution_providers = [
+            ('TensorrtExecutionProvider',{
+                'trt_max_partition_iterations': 2000,
+                'trt_fp16_enable': False,
+                'trt_engine_cache_enable': True,
+                'trt_engine_cache_path':'./trtcache',
+                'trt_timing_cache_enable': True
+            })]
+
 
 def encode_execution_providers(execution_providers: List[str]) -> List[str]:
     return [execution_provider.replace('ExecutionProvider', '').lower() for execution_provider in execution_providers]
@@ -91,7 +134,7 @@ def suggest_execution_threads() -> int:
         return 1
     if 'ROCMExecutionProvider' in roop.globals.execution_providers:
         return 1
-    return 8
+    return 4
 
 
 def limit_resources() -> None:

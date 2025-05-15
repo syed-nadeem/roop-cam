@@ -9,11 +9,11 @@ import roop.globals
 import roop.metadata
 from roop.face_analyser import get_one_face
 from roop.capturer import get_video_frame, get_video_frame_total
-from roop.predicter import predict_frame
 from roop.processors.frame.core import get_frame_processors_modules
 from roop.utilities import is_image, is_video, resolve_relative_path
 
 import cv2
+import threading
 
 ROOT = None
 ROOT_HEIGHT = 700
@@ -105,7 +105,6 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
     donate_label.bind('<Button>', lambda event: webbrowser.open('https://paypal.me/hacksider'))
 
     return root
-
 
 def create_preview(parent: ctk.CTkToplevel) -> ctk.CTkToplevel:
     global preview_label, preview_slider
@@ -223,8 +222,6 @@ def init_preview() -> None:
 def update_preview(frame_number: int = 0) -> None:
     if roop.globals.source_path and roop.globals.target_path:
         temp_frame = get_video_frame(roop.globals.target_path, frame_number)
-        if predict_frame(temp_frame):
-            quit()
         for frame_processor in get_frame_processors_modules(roop.globals.frame_processors):
             temp_frame = frame_processor.process_frame(
                 get_one_face(cv2.imread(roop.globals.source_path)),
@@ -243,12 +240,13 @@ def webcam_preview():
     
     global preview_label, PREVIEW
 
-    cap = cv2.VideoCapture(0)  # Use index for the webcam (adjust the index accordingly if necessary)    
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)  # Set the width of the resolution
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)  # Set the height of the resolution
-    cap.set(cv2.CAP_PROP_FPS, 60)  # Set the frame rate of the webcam
-    PREVIEW_MAX_HEIGHT = 720
-    PREVIEW_MAX_WIDTH = 1280
+    cap = cv2.VideoCapture(0)  # Use index for the webcam (adjust the index accordingly if necessary)
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M', 'J', 'P', 'G'))      
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)  # Set the width of the resolution
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)  # Set the height of the resolution
+    cap.set(cv2.CAP_PROP_FPS, 25)  # Set the frame rate of the webcam
+    PREVIEW_MAX_HEIGHT = 640
+    PREVIEW_MAX_WIDTH = 480
 
     preview_label.configure(image=None)  # Reset the preview image before startup
 
